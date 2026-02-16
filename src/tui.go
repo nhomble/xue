@@ -443,7 +443,7 @@ func (m Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if value != "" {
 				switch prevMode {
 				case modeCreateWorkspace:
-					_, err := m.store.Create(value, nil)
+					_, err := m.store.Create(value)
 					if err != nil {
 						m.errMsg = err.Error()
 					} else {

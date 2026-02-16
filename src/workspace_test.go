@@ -16,15 +16,15 @@ func newTestStore(t *testing.T) *WorkspaceStore {
 func TestWorkspaceCreateAndGet(t *testing.T) {
 	store := newTestStore(t)
 
-	ws, err := store.Create("test-ws", []string{"/tmp/repo1"})
+	ws, err := store.Create("test-ws")
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 	if ws.Name != "test-ws" {
 		t.Errorf("expected name test-ws, got %s", ws.Name)
 	}
-	if len(ws.Repos) != 1 || ws.Repos[0] != "/tmp/repo1" {
-		t.Errorf("unexpected repos: %v", ws.Repos)
+	if len(ws.Repos) != 0 {
+		t.Errorf("expected no repos, got %v", ws.Repos)
 	}
 
 	got, err := store.Get(ws.ID)
@@ -39,8 +39,8 @@ func TestWorkspaceCreateAndGet(t *testing.T) {
 func TestWorkspaceList(t *testing.T) {
 	store := newTestStore(t)
 
-	store.Create("first", nil)
-	store.Create("second", nil)
+	store.Create("first")
+	store.Create("second")
 
 	list, err := store.List()
 	if err != nil {
@@ -54,7 +54,7 @@ func TestWorkspaceList(t *testing.T) {
 func TestWorkspaceDelete(t *testing.T) {
 	store := newTestStore(t)
 
-	ws, _ := store.Create("delete-me", nil)
+	ws, _ := store.Create("delete-me")
 	if err := store.Delete(ws.ID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestWorkspaceDelete(t *testing.T) {
 
 func TestWorkspaceAddRepo(t *testing.T) {
 	store := newTestStore(t)
-	ws, _ := store.Create("ws", nil)
+	ws, _ := store.Create("ws")
 
 	// Create a temp dir to use as a local repo
 	repoDir := t.TempDir()
@@ -98,7 +98,7 @@ func TestWorkspaceAddRepo(t *testing.T) {
 
 func TestWorkspaceUpdateSettings(t *testing.T) {
 	store := newTestStore(t)
-	ws, _ := store.Create("ws", nil)
+	ws, _ := store.Create("ws")
 
 	settings := WorkspaceSettings{Model: "opus", MaxTokens: 4096}
 	if err := store.UpdateSettings(ws.ID, settings); err != nil {

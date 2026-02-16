@@ -59,12 +59,11 @@ func NewWorkspaceStore() (*WorkspaceStore, error) {
 	return &WorkspaceStore{dir: dir}, nil
 }
 
-func (s *WorkspaceStore) Create(name string, repos []string) (*Workspace, error) {
+func (s *WorkspaceStore) Create(name string) (*Workspace, error) {
 	id := generateID()
 	w := &Workspace{
 		ID:           id,
 		Name:         name,
-		Repos:        repos,
 		CreatedAt:    time.Now(),
 		LastAccessed: time.Now(),
 	}
