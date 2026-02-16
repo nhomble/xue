@@ -13,7 +13,7 @@ Requires Go 1.22+ and [Claude CLI](https://docs.anthropic.com/en/docs/claude-cli
 ## Usage
 
 ```
-xue                              # launch TUI
+xue
 ```
 
 ## TUI keys
