@@ -36,6 +36,9 @@ const (
 
 // Messages
 type tickMsg time.Time
+type repoAddedMsg struct {
+	err error
+}
 
 // Model is the main bubbletea model.
 type Model struct {
@@ -66,6 +69,9 @@ type Model struct {
 	// Settings
 	settingsIndex  int // which setting row is selected
 	settingsEditing bool // currently editing a text setting
+
+	// Clone progress
+	cloning bool // true while a git clone is in progress
 
 }
 
@@ -116,6 +122,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		return m, tickEvery()
+
+	case repoAddedMsg:
+		m.cloning = false
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+		} else {
+			m.workspaces, _ = m.store.List()
+		}
+		return m, nil
 	}
 
 	switch m.mode {
@@ -464,11 +479,13 @@ func (m Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case modeAttachRepo:
 					if len(m.workspaces) > 0 {
 						ws := m.workspaces[m.wsIndex]
-						_, err := m.store.AddRepo(ws.ID, value)
-						if err != nil {
-							m.errMsg = err.Error()
-						} else {
-							m.workspaces, _ = m.store.List()
+						wsID := ws.ID
+						input := value
+						store := m.store
+						m.cloning = true
+						return m, func() tea.Msg {
+							_, err := store.AddRepo(wsID, input)
+							return repoAddedMsg{err: err}
 						}
 					}
 
@@ -491,7 +508,7 @@ func (m Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "esc":
+		case "esc", "ctrl+c":
 			if prevMode := m.mode; prevMode == modeFollowUp {
 				m.mode = modeThreadChain
 			} else {
@@ -695,7 +712,9 @@ func (m Model) viewDashboard() string {
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
 	errLine := ""
-	if m.errMsg != "" {
+	if m.cloning {
+		errLine = "\n" + mutedStyle.Render("  cloning repository...")
+	} else if m.errMsg != "" {
 		errLine = "\n" + errorStyle.Render("  "+m.errMsg)
 	}
 

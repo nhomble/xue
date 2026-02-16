@@ -73,13 +73,10 @@ func ResolveRepo(input string, workspaceDir string) (localPath string, err error
 			return dest, nil
 		}
 
-		fmt.Fprintf(os.Stderr, "[xue] Cloning %s...\n", cloneURL)
-
-		cmd := exec.Command("git", "clone", cloneURL, dest)
-		cmd.Stdout = os.Stderr
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return "", fmt.Errorf("git clone failed: %w", err)
+		cmd := exec.Command("git", "clone", "--progress", cloneURL, dest)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("git clone failed: %w\n%s", err, string(out))
 		}
 
 		return dest, nil
