@@ -522,7 +522,7 @@ func (m Model) viewThreadChain() string {
 
 	panel := activePanelStyle.Width(m.width - 4).Render(content)
 
-	help := helpStyle.Render("↑/↓: navigate  enter: view answer  f: follow-up  d: delete  esc: back")
+	help := helpStyle.Render("↑/↓: navigate  enter: view answer  f: follow-up  d: delete  q: back")
 
 	return header + "\n" + meta + "\n" + sep + "\n" + panel + "\n\n" + help
 }
@@ -795,7 +795,7 @@ func (m Model) viewRepoList() string {
 		result = "\n\n" + mutedStyle.Render(m.pullResult)
 	}
 
-	help := helpStyle.Render("j/k navigate · p pull · d remove · a add · esc back")
+	help := helpStyle.Render("j/k navigate · p pull · d remove · a add · q back")
 
 	return fmt.Sprintf("%s\n\n%s%s\n\n%s", header, content, result, help)
 }
@@ -942,7 +942,7 @@ func (m Model) viewAnswer() string {
 		Width(m.width - 4).
 		Height(m.height - 8)
 
-	help := helpStyle.Render("scroll: up/down/pgup/pgdn  f: follow-up  q/esc: back")
+	help := helpStyle.Render("scroll: up/down/pgup/pgdn  f: follow-up  q: back")
 
 	return header + "\n" + meta + "\n" + sep + "\n" + border.Render(m.viewport.View()) + "\n" + help
 }
@@ -953,16 +953,16 @@ func (m Model) viewInput() string {
 	switch m.mode {
 	case modeCreateWorkspace:
 		title = "Create Workspace"
-		hint = "enter: confirm  esc: cancel"
+		hint = "enter: confirm  q: cancel"
 	case modeCreateThread:
 		title = "Ask a Question"
-		hint = "enter: submit  esc: cancel"
+		hint = "enter: submit  q: cancel"
 	case modeAttachRepo:
 		title = "Add Source"
-		hint = "tab: complete  enter: add  esc: cancel"
+		hint = "tab: complete  enter: add  q: cancel"
 	case modeFollowUp:
 		title = "Follow-up Question"
-		hint = "enter: submit  esc: back"
+		hint = "enter: submit  q: back"
 	}
 
 	content := inputLabelStyle.Render(title) + "\n\n" +
@@ -1201,7 +1201,7 @@ func (m Model) viewSettings() string {
 		Width(60).
 		Render(content)
 
-	help := helpStyle.Render("↑/↓: navigate  enter: change  esc: back")
+	help := helpStyle.Render("↑/↓: navigate  enter: change  q: back")
 
 	return header + "\n\n" + lipgloss.Place(m.width, m.height-4,
 		lipgloss.Center, lipgloss.Center,
