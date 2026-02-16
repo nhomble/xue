@@ -89,6 +89,20 @@ func TestCompletePath(t *testing.T) {
 	}
 }
 
+func TestIsGitRepo(t *testing.T) {
+	// Non-git dir
+	dir := t.TempDir()
+	if IsGitRepo(dir) {
+		t.Error("expected false for non-git dir")
+	}
+
+	// Create .git dir to simulate git repo
+	os.Mkdir(filepath.Join(dir, ".git"), 0755)
+	if !IsGitRepo(dir) {
+		t.Error("expected true for dir with .git")
+	}
+}
+
 func TestCompletePathEmpty(t *testing.T) {
 	// Should not panic on empty input
 	results := CompletePath("", 5)

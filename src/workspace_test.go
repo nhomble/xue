@@ -96,6 +96,33 @@ func TestWorkspaceAddRepo(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRemoveRepo(t *testing.T) {
+	store := newTestStore(t)
+	ws, _ := store.Create("ws")
+
+	repoDir1 := t.TempDir()
+	repoDir2 := t.TempDir()
+	store.AddRepo(ws.ID, repoDir1)
+	store.AddRepo(ws.ID, repoDir2)
+
+	got, _ := store.Get(ws.ID)
+	if len(got.Repos) != 2 {
+		t.Fatalf("expected 2 repos, got %d", len(got.Repos))
+	}
+
+	if err := store.RemoveRepo(ws.ID, repoDir1); err != nil {
+		t.Fatalf("RemoveRepo failed: %v", err)
+	}
+
+	got, _ = store.Get(ws.ID)
+	if len(got.Repos) != 1 {
+		t.Errorf("expected 1 repo after remove, got %d", len(got.Repos))
+	}
+	if got.Repos[0] != repoDir2 {
+		t.Errorf("expected %s to remain, got %s", repoDir2, got.Repos[0])
+	}
+}
+
 func TestWorkspaceUpdateSettings(t *testing.T) {
 	store := newTestStore(t)
 	ws, _ := store.Create("ws")

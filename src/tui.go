@@ -25,6 +25,7 @@ const (
 	modeSettings
 	modeFollowUp
 	modeConfirmDelete
+	modeRepoList
 )
 
 // Focus panel in dashboard
@@ -39,6 +40,11 @@ const (
 type tickMsg time.Time
 type repoAddedMsg struct {
 	err error
+}
+type gitPullMsg struct {
+	repo string
+	out  string
+	err  error
 }
 
 // Model is the main bubbletea model.
@@ -76,6 +82,11 @@ type Model struct {
 
 	// Delete confirmation
 	confirmDeleteName string // name of workspace pending deletion
+
+	// Repo list
+	repoListIndex int    // cursor in repo list
+	pullingRepo   string // path of repo being pulled
+	pullResult    string // output of last pull
 
 }
 
@@ -135,6 +146,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.workspaces, _ = m.store.List()
 		}
 		return m, nil
+
+	case gitPullMsg:
+		m.pullingRepo = ""
+		if msg.err != nil {
+			m.pullResult = msg.err.Error()
+		} else {
+			m.pullResult = msg.out
+		}
+		return m, nil
 	}
 
 	switch m.mode {
@@ -148,6 +168,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSettings(msg)
 	case modeConfirmDelete:
 		return m.updateConfirmDelete(msg)
+	case modeRepoList:
+		return m.updateRepoList(msg)
 	case modeCreateWorkspace, modeCreateThread, modeAttachRepo, modeFollowUp:
 		return m.updateInput(msg)
 	}
@@ -171,6 +193,62 @@ func (m Model) updateConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = modeDashboard
 		case "n", "N", "esc", "ctrl+c":
 			m.mode = modeDashboard
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateRepoList(msg tea.Msg) (tea.Model, tea.Cmd) {
+	ws := m.workspaces[m.wsIndex]
+	repos := ws.Repos
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		m.pullResult = ""
+		switch msg.String() {
+		case "esc", "q":
+			m.mode = modeDashboard
+			return m, nil
+		case "j", "down":
+			if m.repoListIndex < len(repos)-1 {
+				m.repoListIndex++
+			}
+		case "k", "up":
+			if m.repoListIndex > 0 {
+				m.repoListIndex--
+			}
+		case "p":
+			if len(repos) > 0 && m.repoListIndex < len(repos) && m.pullingRepo == "" {
+				repo := repos[m.repoListIndex]
+				if !IsGitRepo(repo) {
+					m.pullResult = "not a git repo"
+					return m, nil
+				}
+				m.pullingRepo = repo
+				return m, func() tea.Msg {
+					out, err := GitPull(repo)
+					return gitPullMsg{repo: repo, out: out, err: err}
+				}
+			}
+		case "d":
+			if len(repos) > 0 && m.repoListIndex < len(repos) {
+				repo := repos[m.repoListIndex]
+				m.store.RemoveRepo(ws.ID, repo)
+				m.workspaces, _ = m.store.List()
+				if m.repoListIndex > 0 && m.repoListIndex >= len(m.workspaces[m.wsIndex].Repos) {
+					m.repoListIndex--
+				}
+				if len(m.workspaces[m.wsIndex].Repos) == 0 {
+					m.mode = modeDashboard
+					return m, nil
+				}
+			}
+		case "a":
+			m.mode = modeAttachRepo
+			m.input.SetValue("")
+			m.input.Placeholder = "path to repo, GitHub URL, or user/repo"
+			m.input.Focus()
+			return m, textinput.Blink
 		}
 	}
 	return m, nil
@@ -248,6 +326,21 @@ func (m Model) updateDashboard(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = modeSettings
 			m.settingsIndex = 0
 			m.settingsEditing = false
+			return m, nil
+
+		case "r":
+			if len(m.workspaces) == 0 {
+				m.errMsg = "create a workspace first (w)"
+				return m, nil
+			}
+			ws := m.workspaces[m.wsIndex]
+			if len(ws.Repos) == 0 {
+				m.errMsg = "add repos first (a)"
+				return m, nil
+			}
+			m.mode = modeRepoList
+			m.repoListIndex = 0
+			m.pullResult = ""
 			return m, nil
 
 		case "a":
@@ -634,6 +727,8 @@ func (m Model) View() string {
 		return m.viewSettings()
 	case modeConfirmDelete:
 		return m.viewConfirmDelete()
+	case modeRepoList:
+		return m.viewRepoList()
 	case modeCreateWorkspace, modeCreateThread, modeAttachRepo, modeFollowUp:
 		return m.viewInput()
 	default:
@@ -655,6 +750,54 @@ func (m Model) viewConfirmDelete() string {
 	dialog := box.Render(prompt)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
+}
+
+func (m Model) viewRepoList() string {
+	ws := m.workspaces[m.wsIndex]
+
+	header := titleStyle.Render("  xue.") + mutedStyle.Render("  repos — "+ws.Name)
+	var lines []string
+
+	for i, repo := range ws.Repos {
+		cursor := "  "
+		style := listItemStyle
+		if i == m.repoListIndex {
+			cursor = "> "
+			style = selectedItemStyle
+		}
+
+		name := filepath.Base(repo)
+		line := cursor + style.Render(name)
+
+		// Git indicator
+		if IsGitRepo(repo) {
+			line += " " + tagStyle.Render("git")
+		} else {
+			line += " " + mutedStyle.Render("local")
+		}
+
+		// Pull status
+		if m.pullingRepo == repo {
+			line += " " + statusRunning.Render("pulling...")
+		}
+
+		// Path
+		line += " " + mutedStyle.Render(repo)
+
+		lines = append(lines, line)
+	}
+
+	content := strings.Join(lines, "\n")
+
+	// Pull result
+	result := ""
+	if m.pullResult != "" {
+		result = "\n\n" + mutedStyle.Render(m.pullResult)
+	}
+
+	help := helpStyle.Render("j/k navigate · p pull · d remove · a add · esc back")
+
+	return fmt.Sprintf("%s\n\n%s%s\n\n%s", header, content, result, help)
 }
 
 func (m Model) viewDashboard() string {
@@ -760,7 +903,7 @@ func (m Model) viewDashboard() string {
 		errLine = "\n" + errorStyle.Render("  "+m.errMsg)
 	}
 
-	help := helpStyle.Render("w: workspace  a: add source  n: ask question  s: settings  enter: view  d: delete  tab: switch  q: quit")
+	help := helpStyle.Render("w: workspace  a: add source  r: repos  n: ask question  s: settings  enter: view  d: delete  tab: switch  q: quit")
 
 	return header + "\n\n" + body + errLine + "\n\n" + help
 }

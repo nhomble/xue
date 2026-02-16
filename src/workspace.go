@@ -143,6 +143,21 @@ func (s *WorkspaceStore) AddRepo(id, input string) (string, error) {
 	return localPath, s.save(w)
 }
 
+func (s *WorkspaceStore) RemoveRepo(id, repoPath string) error {
+	w, err := s.load(id)
+	if err != nil {
+		return err
+	}
+	var filtered []string
+	for _, r := range w.Repos {
+		if r != repoPath {
+			filtered = append(filtered, r)
+		}
+	}
+	w.Repos = filtered
+	return s.save(w)
+}
+
 func (s *WorkspaceStore) UpdateSettings(id string, settings WorkspaceSettings) error {
 	w, err := s.load(id)
 	if err != nil {

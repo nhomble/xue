@@ -111,6 +111,22 @@ func classifyRepo(input string) (cloneURL, repoName string, kind RepoKind) {
 	return input, filepath.Base(input), RepoLocal
 }
 
+// IsGitRepo checks if the given path contains a .git directory.
+func IsGitRepo(path string) bool {
+	info, err := os.Stat(filepath.Join(path, ".git"))
+	return err == nil && info.IsDir()
+}
+
+// GitPull runs git pull in the given repo directory.
+func GitPull(path string) (string, error) {
+	cmd := exec.Command("git", "-C", path, "pull")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git pull failed: %w\n%s", err, string(out))
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // CompletePath returns filesystem path completions for the given partial input.
 // Returns up to maxResults matching directories.
 func CompletePath(partial string, maxResults int) []string {
