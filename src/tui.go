@@ -24,6 +24,7 @@ const (
 	modeAttachRepo
 	modeSettings
 	modeFollowUp
+	modeConfirmDelete
 )
 
 // Focus panel in dashboard
@@ -72,6 +73,9 @@ type Model struct {
 
 	// Clone progress
 	cloning bool // true while a git clone is in progress
+
+	// Delete confirmation
+	confirmDeleteName string // name of workspace pending deletion
 
 }
 
@@ -142,10 +146,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateViewAnswer(msg)
 	case modeSettings:
 		return m.updateSettings(msg)
+	case modeConfirmDelete:
+		return m.updateConfirmDelete(msg)
 	case modeCreateWorkspace, modeCreateThread, modeAttachRepo, modeFollowUp:
 		return m.updateInput(msg)
 	}
 
+	return m, nil
+}
+
+func (m Model) updateConfirmDelete(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "y", "Y":
+			if len(m.workspaces) > 0 && m.wsIndex < len(m.workspaces) {
+				ws := m.workspaces[m.wsIndex]
+				m.store.Delete(ws.ID)
+				m.workspaces, _ = m.store.List()
+				if m.wsIndex >= len(m.workspaces) && m.wsIndex > 0 {
+					m.wsIndex--
+				}
+			}
+			m.mode = modeDashboard
+		case "n", "N", "esc", "ctrl+c":
+			m.mode = modeDashboard
+		}
+	}
 	return m, nil
 }
 
@@ -261,11 +288,8 @@ func (m Model) updateDashboard(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else if m.panel == panelWorkspaces && len(m.workspaces) > 0 {
 				ws := m.workspaces[m.wsIndex]
-				m.store.Delete(ws.ID)
-				m.workspaces, _ = m.store.List()
-				if m.wsIndex >= len(m.workspaces) && m.wsIndex > 0 {
-					m.wsIndex--
-				}
+				m.confirmDeleteName = ws.Name
+				m.mode = modeConfirmDelete
 			}
 		}
 	}
@@ -608,11 +632,29 @@ func (m Model) View() string {
 		return m.viewAnswer()
 	case modeSettings:
 		return m.viewSettings()
+	case modeConfirmDelete:
+		return m.viewConfirmDelete()
 	case modeCreateWorkspace, modeCreateThread, modeAttachRepo, modeFollowUp:
 		return m.viewInput()
 	default:
 		return m.viewDashboard()
 	}
+}
+
+func (m Model) viewConfirmDelete() string {
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("9")).
+		Padding(1, 3).
+		Width(50).
+		Align(lipgloss.Center)
+
+	prompt := lipgloss.NewStyle().Bold(true).Render("Delete workspace \""+m.confirmDeleteName+"\"?") +
+		"\n\n" + mutedStyle.Render("y to confirm / n to cancel")
+
+	dialog := box.Render(prompt)
+
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
 }
 
 func (m Model) viewDashboard() string {
