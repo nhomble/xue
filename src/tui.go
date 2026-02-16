@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -444,8 +443,7 @@ func (m Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if value != "" {
 				switch prevMode {
 				case modeCreateWorkspace:
-					cwd, _ := os.Getwd()
-					_, err := m.store.Create(value, []string{cwd})
+					_, err := m.store.Create(value, nil)
 					if err != nil {
 						m.errMsg = err.Error()
 					} else {
