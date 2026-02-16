@@ -601,7 +601,7 @@ func (m Model) View() string {
 }
 
 func (m Model) viewDashboard() string {
-	header := titleStyle.Render("  xue") + mutedStyle.Render("  学 · study your repos")
+	header := titleStyle.Render("  xue.") + mutedStyle.Render("  study your repos")
 
 	leftWidth := m.width/3 - 2
 	rightWidth := m.width - leftWidth - 4
