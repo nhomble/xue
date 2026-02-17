@@ -20,7 +20,7 @@ func launchTUI() {
 		fatal("failed to initialize workspace store: %v", err)
 	}
 
-	threads := NewThreadManager(store)
+	threads := NewThreadManager(store, ClaudeAgent{})
 	threads.LoadAllThreads()
 	defer threads.StopAll()
 

@@ -59,11 +59,13 @@ type ThreadManager struct {
 	mu      sync.Mutex
 	threads []*Thread
 	store   *WorkspaceStore
+	agent   Agent
 }
 
-func NewThreadManager(store *WorkspaceStore) *ThreadManager {
+func NewThreadManager(store *WorkspaceStore, agent Agent) *ThreadManager {
 	return &ThreadManager{
 		store: store,
+		agent: agent,
 	}
 }
 
@@ -163,42 +165,14 @@ func (tm *ThreadManager) SpawnWithParent(question, workspaceID, parentID string)
 	// Build conversation context from parent chain
 	contextPrompt := tm.buildConversationContext(parentID)
 
-	// The actual prompt sent to claude: context + new question
+	// The actual prompt sent to the agent: context + new question
 	fullPrompt := question
 	if contextPrompt != "" {
 		fullPrompt = contextPrompt + "\n\nFollow-up question: " + question
 	}
 
-	args := []string{"-p", fullPrompt}
-	if ws.Settings.Model != "" {
-		args = append(args, "--model", ws.Settings.Model)
-	}
-	if ws.Settings.MaxTokens > 0 {
-		args = append(args, "--max-tokens", fmt.Sprintf("%d", ws.Settings.MaxTokens))
-	}
-	if ws.Settings.SystemPrompt != "" {
-		args = append(args, "--system-prompt", ws.Settings.SystemPrompt)
-	}
-	for _, repo := range ws.Repos {
-		args = append(args, "--add-dir", repo)
-	}
-
 	id := generateID()
-	cmd := exec.Command("claude", args...)
-
-	// Unset CLAUDECODE so claude doesn't refuse to run
-	env := os.Environ()
-	filtered := make([]string, 0, len(env))
-	for _, e := range env {
-		if !strings.HasPrefix(e, "CLAUDECODE=") {
-			filtered = append(filtered, e)
-		}
-	}
-	cmd.Env = filtered
-
-	if len(ws.Repos) > 0 {
-		cmd.Dir = ws.Repos[0]
-	}
+	cmd := tm.agent.BuildCommand(fullPrompt, ws.Settings, ws.Repos)
 
 	t := &Thread{
 		ID:          id,
@@ -216,7 +190,7 @@ func (tm *ThreadManager) SpawnWithParent(question, workspaceID, parentID string)
 	cmd.Stderr = &threadWriter{thread: t}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start claude: %w", err)
+		return nil, fmt.Errorf("failed to start agent: %w", err)
 	}
 
 	go func() {
